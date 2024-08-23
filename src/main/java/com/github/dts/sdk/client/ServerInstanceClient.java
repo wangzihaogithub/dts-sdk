@@ -50,7 +50,8 @@ public class ServerInstanceClient {
         String basicAuth = "Basic " + Util.encodeBasicAuth(sdkInstance.getAccount(), sdkInstance.getPassword(), Charset.forName("UTF-8"));
         URL url;
         try {
-            url = new URL(String.format("http://%s:%s/dts/sdk/subscriber", serverInstance.getIp(), serverInstance.getPort()));
+            url = new URL(String.format("http://%s:%s%s/dts/sdk/subscriber",
+                    serverInstance.getIp(), serverInstance.getPort(), clusterConfig.remoteContextPath()));
         } catch (MalformedURLException e) {
             Util.sneakyThrows(e);
             return;

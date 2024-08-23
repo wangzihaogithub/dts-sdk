@@ -44,6 +44,27 @@ public class DtsSdkConfig {
         private final Yaml yaml = new Yaml();
         private int testSocketTimeoutMs = 500;
         private DiscoveryEnum discovery = DiscoveryEnum.REDIS;
+        private String remoteContextPath = "";
+
+        public String remoteContextPath() {
+            String remoteContextPath = this.remoteContextPath;
+            if (remoteContextPath == null || remoteContextPath.isEmpty() || remoteContextPath.equals("/")) {
+                remoteContextPath = "";
+            } else {
+                if (!remoteContextPath.startsWith("/")) {
+                    remoteContextPath = "/" + remoteContextPath;
+                }
+            }
+            return remoteContextPath;
+        }
+
+        public String getRemoteContextPath() {
+            return remoteContextPath;
+        }
+
+        public void setRemoteContextPath(String remoteContextPath) {
+            this.remoteContextPath = remoteContextPath;
+        }
 
         public int getTestSocketTimeoutMs() {
             return testSocketTimeoutMs;
