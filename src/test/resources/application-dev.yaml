@@ -1,0 +1,10 @@
+server:
+  dts:
+    sdk:
+      cluster:
+        discovery: yaml
+        yaml:
+          dts-server:
+          sdk-account:
+            account:
+            password:

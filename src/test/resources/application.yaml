@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: 'dts-sdk'
+  profiles:
+    active: dev
+server:
+  port: 8081
