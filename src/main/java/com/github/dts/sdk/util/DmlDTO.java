@@ -16,8 +16,16 @@ public class DmlDTO {
     private Map<String, Object> data;
     private List<String> indexNames;
     private List<String> desc;
+    private Boolean effect;
+    private transient Object[] id;
 
-    private Object[] id;
+    public Boolean getEffect() {
+        return effect;
+    }
+
+    public void setEffect(Boolean effect) {
+        this.effect = effect;
+    }
 
     public String getIdString() {
         Object id = getId();
@@ -49,10 +57,9 @@ public class DmlDTO {
                 for (int i = 0; i < pkNames.size(); i++) {
                     String pkName = pkNames.get(i);
                     Object rowId = null;
-                    if (old != null) {
+                    if (old != null && old.containsKey(pkName)) {
                         rowId = old.get(pkName);
-                    }
-                    if (rowId == null && data != null) {
+                    } else if (data != null && data.containsKey(pkName)) {
                         rowId = data.get(pkName);
                     }
                     ids[i] = rowId;
