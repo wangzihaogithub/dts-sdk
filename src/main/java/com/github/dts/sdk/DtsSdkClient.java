@@ -10,7 +10,6 @@ import org.springframework.beans.factory.ListableBeanFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.function.BiPredicate;
@@ -76,21 +75,11 @@ public class DtsSdkClient {
             if (!dml.getIndexNames().contains(indexName)) {
                 return false;
             }
-            List<String> pkNames = dml.getPkNames();
-            if (pkNames == null || pkNames.size() != 1) {
+            Object[] ids = dml.getIds();
+            if (ids.length != 1) {
                 return false;
             }
-            String pkName = pkNames.iterator().next();
-            Map<String, Object> old = dml.getOld();
-            Object rowId = null;
-            if (old != null) {
-                rowId = old.get(pkName);
-            }
-            Map<String, Object> data = dml.getData();
-            if (rowId == null && data != null) {
-                rowId = data.get(pkName);
-            }
-            String rowIdString = Objects.toString(rowId, null);
+            String rowIdString = Objects.toString(ids[0], null);
             String idString = Objects.toString(id, null);
             return Objects.equals(rowIdString, idString);
         }
