@@ -40,7 +40,7 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
     private final RedisTemplate<byte[], byte[]> redisTemplate = new RedisTemplate<>();
     private final SdkInstance sdkInstance;
     private final byte[] sdkInstanceBytes;
-    private final ReferenceCounted<List<RedisServerInstanceClient>> serverInstanceClientListRef = new ReferenceCounted<>(new CopyOnWriteArrayList<>());
+    private final ReferenceCounted<List<ServerInstanceClient>> serverInstanceClientListRef = new ReferenceCounted<>(new CopyOnWriteArrayList<>());
     private final Collection<ServerListener> serverListenerList = new CopyOnWriteArrayList<>();
     private final int updateInstanceTimerMs;
     private long serverHeartbeatCount;
@@ -113,13 +113,13 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
         return scheduled;
     }
 
-    public List<RedisServerInstanceClient> newServerInstanceClient(Collection<ServerInstance> instanceList) {
+    public List<ServerInstanceClient> newServerInstanceClient(Collection<ServerInstance> instanceList) {
         int size = instanceList.size();
-        List<RedisServerInstanceClient> list = new ArrayList<>(size);
+        List<ServerInstanceClient> list = new ArrayList<>(size);
         for (ServerInstance instance : instanceList) {
             boolean socketConnected = ServerInstance.isSocketConnected(instance, clusterConfig.getTestSocketTimeoutMs());
             try {
-                RedisServerInstanceClient service = new RedisServerInstanceClient(socketConnected, sdkInstance, instance, clusterConfig);
+                ServerInstanceClient service = new ServerInstanceClient(socketConnected, sdkInstance, instance, clusterConfig);
                 list.add(service);
             } catch (Exception e) {
                 throw new IllegalStateException(
@@ -151,7 +151,7 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
     }
 
     @Override
-    public ReferenceCounted<List<RedisServerInstanceClient>> getServerListRef() {
+    public ReferenceCounted<List<ServerInstanceClient>> getServerListRef() {
         while (true) {
             try {
                 return serverInstanceClientListRef.open();
@@ -212,19 +212,19 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
         List<ServerInstance> insertList = diff.getInsertList().stream().map(serverInstanceMap::get).collect(Collectors.toList());
         List<ServerInstance> deleteList = diff.getDeleteList().stream().map(this.serverInstanceMap::get).collect(Collectors.toList());
         log.info("updateServerInstance insert={}, delete={}", insertList, deleteList);
-        List<RedisServerInstanceClient> deleteClientList;
-        List<RedisServerInstanceClient> insertClientList;
-        List<RedisServerInstanceClient> refs = serverInstanceClientListRef.get();
+        List<ServerInstanceClient> deleteClientList;
+        List<ServerInstanceClient> insertClientList;
+        List<ServerInstanceClient> refs = serverInstanceClientListRef.get();
         if (deleteList.isEmpty()) {
             deleteClientList = Collections.emptyList();
         } else {
             Set<String> deleteAccountSet = deleteList.stream().map(ServerInstance::getAccount).collect(Collectors.toSet());
             deleteClientList = refs.stream().filter(e -> deleteAccountSet.contains(e.getAccount())).collect(Collectors.toList());
-            for (RedisServerInstanceClient client : deleteClientList) {
+            for (ServerInstanceClient client : deleteClientList) {
                 client.discoveryClose();
             }
             refs.removeIf(next -> {
-                for (RedisServerInstanceClient client : deleteClientList) {
+                for (ServerInstanceClient client : deleteClientList) {
                     if (next == client) {
                         return true;
                     }
@@ -247,12 +247,12 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
         this.serverUpdateInstanceCount++;
     }
 
-    private void notifyServerChangeEvent(List<RedisServerInstanceClient> insertList,
-                                         List<RedisServerInstanceClient> deleteList) {
+    private void notifyServerChangeEvent(List<ServerInstanceClient> insertList,
+                                         List<ServerInstanceClient> deleteList) {
         if (serverListenerList.isEmpty()) {
             return;
         }
-        ServerChangeEvent<RedisServerInstanceClient> event = new ServerChangeEvent<>(serverUpdateInstanceCount, insertList, deleteList);
+        ServerChangeEvent<ServerInstanceClient> event = new ServerChangeEvent<>(serverUpdateInstanceCount, insertList, deleteList);
         for (ServerListener listener : serverListenerList) {
             listener.onChange(event);
         }

@@ -4,7 +4,7 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 
-public class DmlDTO {
+public class EsDmlDTO implements Dml {
     private static final Object[] EMPTY = new Object[0];
     private String tableName;
     private String database;
@@ -18,6 +18,7 @@ public class DmlDTO {
     private List<String> desc;
     private Boolean effect;
     private transient Object[] id;
+    private transient String toStringCache;
 
     public Boolean getEffect() {
         return effect;
@@ -72,14 +73,15 @@ public class DmlDTO {
 
     @Override
     public String toString() {
-        return "DmlDTO{" +
-                "tableName='" + tableName + '\'' +
-                ", database='" + database + '\'' +
-                ", es=" + new Timestamp(es) +
-                ", type='" + type + '\'' +
-                ", indexNames=" + indexNames +
-                ", desc=" + desc +
-                '}';
+        if (toStringCache == null) {
+            toStringCache = "EsDmlDTO{" +
+                    "sql=" + sql() +
+                    ", es=" + new Timestamp(es) +
+                    ", indexNames=" + indexNames +
+                    ", desc=" + desc +
+                    '}';
+        }
+        return toStringCache;
     }
 
     public List<String> getDesc() {
@@ -90,6 +92,7 @@ public class DmlDTO {
         this.desc = desc;
     }
 
+    @Override
     public String getTableName() {
         return tableName;
     }
@@ -98,6 +101,7 @@ public class DmlDTO {
         this.tableName = tableName;
     }
 
+    @Override
     public String getDatabase() {
         return database;
     }
@@ -106,6 +110,7 @@ public class DmlDTO {
         this.database = database;
     }
 
+    @Override
     public List<String> getPkNames() {
         return pkNames;
     }
@@ -114,6 +119,7 @@ public class DmlDTO {
         this.pkNames = pkNames;
     }
 
+    @Override
     public Long getEs() {
         return es;
     }
@@ -122,6 +128,7 @@ public class DmlDTO {
         this.es = es;
     }
 
+    @Override
     public Long getTs() {
         return ts;
     }
@@ -130,6 +137,7 @@ public class DmlDTO {
         this.ts = ts;
     }
 
+    @Override
     public String getType() {
         return type;
     }
@@ -138,6 +146,7 @@ public class DmlDTO {
         this.type = type;
     }
 
+    @Override
     public Map<String, Object> getOld() {
         return old;
     }
@@ -146,6 +155,7 @@ public class DmlDTO {
         this.old = old;
     }
 
+    @Override
     public Map<String, Object> getData() {
         return data;
     }

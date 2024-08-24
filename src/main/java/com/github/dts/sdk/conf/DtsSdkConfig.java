@@ -10,6 +10,15 @@ public class DtsSdkConfig {
     private final ClusterConfig cluster = new ClusterConfig();
     private long requestRetrySleep = 6000L;
     private int requestMaxRetry = 10;
+    private int clearDoneInterval = 100;
+
+    public int getClearDoneInterval() {
+        return clearDoneInterval;
+    }
+
+    public void setClearDoneInterval(int clearDoneInterval) {
+        this.clearDoneInterval = clearDoneInterval;
+    }
 
     public long getRequestRetrySleep() {
         return requestRetrySleep;

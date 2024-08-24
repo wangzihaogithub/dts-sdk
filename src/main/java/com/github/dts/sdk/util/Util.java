@@ -2,6 +2,8 @@ package com.github.dts.sdk.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeansException;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.scheduling.concurrent.CustomizableThreadFactory;
 
 import java.net.InetAddress;
@@ -87,6 +89,15 @@ public class Util {
         }
     }
 
+    public static Object getBean(BeanFactory beanFactory, String beanName, Class type) {
+        Object redisConnectionFactory;
+        try {
+            redisConnectionFactory = beanFactory.getBean(beanName);
+        } catch (BeansException e) {
+            redisConnectionFactory = beanFactory.getBean(type);
+        }
+        return redisConnectionFactory;
+    }
 
     public static ScheduledExecutorService newScheduled(int nThreads, String name, boolean wrapper) {
         return new ScheduledThreadPoolExecutor(

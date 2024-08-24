@@ -1,9 +1,8 @@
 package com.github.dts.sdk.client;
 
 import com.github.dts.sdk.conf.DtsSdkConfig;
-import com.github.dts.sdk.util.DmlDTO;
+import com.github.dts.sdk.util.EsDmlDTO;
 import com.github.dts.sdk.util.JsonUtil;
-import com.github.dts.sdk.util.MessageTypeEnum;
 import com.github.dts.sdk.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,9 +16,9 @@ import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ServerInstanceClient {
@@ -31,7 +30,7 @@ public class ServerInstanceClient {
      * 网络是否可以连上
      */
     private final boolean socketConnected;
-    private final Collection<URLConnection> connectionList = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<URLConnection> connectionList = Collections.newSetFromMap(new IdentityHashMap<>());
     private final AtomicBoolean close = new AtomicBoolean(false);
     private volatile int discoveryCloseCount = 0;
 
@@ -43,6 +42,13 @@ public class ServerInstanceClient {
         this.sdkInstance = sdkInstance;
         this.serverInstance = serverInstance;
         this.clusterConfig = clusterConfig;
+    }
+
+    private static URLConnection openConnection(URL url, String basicAuth) throws IOException {
+        URLConnection connection = url.openConnection();
+        connection.setRequestProperty("Authorization", basicAuth);
+        connection.setRequestProperty("Authorization-fetch", "true");
+        return connection;
     }
 
     public void dump(DumpListener listener, long retrySleep, int maxRetry) {
@@ -119,13 +125,6 @@ public class ServerInstanceClient {
         return discoveryCloseCount > 0;
     }
 
-    private URLConnection openConnection(URL url, String basicAuth) throws IOException {
-        URLConnection connection = url.openConnection();
-        connection.setRequestProperty("Authorization", basicAuth);
-        connection.setRequestProperty("Authorization-fetch", "true");
-        return connection;
-    }
-
     private void read(URLConnection connection, JsonUtil.ObjectReader objectReader, DumpListener listener) throws IOException {
         synchronized (connectionList) {
             connectionList.add(connection);
@@ -150,7 +149,7 @@ public class ServerInstanceClient {
                 try {
                     MessageTypeEnum type = MessageTypeEnum.getByType(buffer.event);
                     if (type == MessageTypeEnum.ES_DML) {
-                        DmlDTO dmlDTO = objectReader.readValue(buffer.data, DmlDTO.class);
+                        EsDmlDTO dmlDTO = objectReader.readValue(buffer.data, EsDmlDTO.class);
                         listener.onEvent(buffer.id, dmlDTO);
                     }
                 } finally {
@@ -177,7 +176,7 @@ public class ServerInstanceClient {
     }
 
     public void discoveryClose() {
-        discoveryCloseCount++;
+        this.discoveryCloseCount++;
     }
 
     private void disconnect(URLConnection urlConnection) {
@@ -240,6 +239,29 @@ public class ServerInstanceClient {
 
         public boolean isEmpty() {
             return id == null && event == null && data == null;
+        }
+    }
+
+    public enum MessageTypeEnum {
+        ES_DML("es-dml"),
+        RDS_SQL("rds-sql");
+        private final String type;
+
+        MessageTypeEnum(String type) {
+            this.type = type;
+        }
+
+        public static MessageTypeEnum getByType(String type) {
+            for (MessageTypeEnum value : values()) {
+                if (value.type.equals(type)) {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        public String getType() {
+            return type;
         }
     }
 }

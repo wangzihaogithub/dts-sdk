@@ -3,7 +3,6 @@ package com.github.dts.sdk.client;
 import com.github.dts.sdk.conf.DtsSdkConfig;
 import com.github.dts.sdk.util.PlatformDependentUtil;
 import com.github.dts.sdk.util.ReferenceCounted;
-import com.github.dts.sdk.util.SpringUtil;
 import com.github.dts.sdk.util.Util;
 import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.core.env.Environment;
@@ -37,7 +36,7 @@ public interface DiscoveryService {
                 if (redisKeyRootPrefix != null) {
                     redisKeyRootPrefix = env.resolvePlaceholders(redisKeyRootPrefix);
                 }
-                Object redisConnectionFactory = SpringUtil.getBean(beanFactory, redis.getRedisConnectionFactoryBeanName(), PlatformDependentUtil.REDIS_CONNECTION_FACTORY_CLASS);
+                Object redisConnectionFactory = Util.getBean(beanFactory, redis.getRedisConnectionFactoryBeanName(), PlatformDependentUtil.REDIS_CONNECTION_FACTORY_CLASS);
                 return new RedisDiscoveryService(
                         redisConnectionFactory,
                         redisKeyRootPrefix,

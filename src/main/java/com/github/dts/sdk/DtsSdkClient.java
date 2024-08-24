@@ -3,26 +3,25 @@ package com.github.dts.sdk;
 import com.github.dts.sdk.client.DiscoveryService;
 import com.github.dts.sdk.client.ServerInstanceClient;
 import com.github.dts.sdk.conf.DtsSdkConfig;
-import com.github.dts.sdk.util.DmlDTO;
+import com.github.dts.sdk.util.EsDmlDTO;
 import com.github.dts.sdk.util.ReferenceCounted;
 import com.github.dts.sdk.util.Util;
 import org.springframework.beans.factory.ListableBeanFactory;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.function.BiPredicate;
 
 public class DtsSdkClient {
     private static final TimeoutException TIMEOUT_EXCEPTION = new TimeoutException("DtsSdkListenTimeout");
     private final DtsDumpListener dumpListener = new DtsDumpListener();
-    private final ScheduledExecutorService scheduled = Util.newScheduled(1, "DTS-dump-scheduled", true);
-    private final List<ListenEs> listenEsList = new ArrayList<>();
+    private final ScheduledExecutorService scheduled = Util.newScheduled(1, "DTS-scheduled", true);
+    private final ArrayList<ListenEs> listenEsList = new ArrayList<>();
 
     public DtsSdkClient(DtsSdkConfig config, DiscoveryService discoveryService, ListableBeanFactory beanFactory) {
         discoveryService.registerSdkInstance();
-        scheduled.scheduleWithFixedDelay(new ClearListener(), 100, 100, TimeUnit.MILLISECONDS);
+        scheduled.scheduleWithFixedDelay(new ClearListener(), config.getClearDoneInterval(), config.getClearDoneInterval(), TimeUnit.MILLISECONDS);
 
         ThreadPoolExecutor executor = Util.newFixedThreadPool(0, 1000, 30000, "DTS-dump", true, true);
         try (ReferenceCounted<List<ServerInstanceClient>> ref = discoveryService.getServerListRef()) {
@@ -40,106 +39,102 @@ public class DtsSdkClient {
         });
     }
 
-    public CompletableFuture<ListenEsResponse> listenEs(String indexName, Object id) {
-        return listenEs(new IndexIdTest(indexName, id), 1, 500);
+    public CompletableFuture<ListenEsResponse> listenEsRow(String tableName, Object id) {
+        return listenEsRow(Filters.primaryKey(tableName, id), 1, 500);
     }
 
-    public CompletableFuture<ListenEsResponse> listenEs(String indexName, Object id, long timeout) {
-        return listenEs(new IndexIdTest(indexName, id), 1, timeout);
+    public CompletableFuture<ListenEsResponse> listenEsRow(String tableName, Object id, long timeout) {
+        return listenEsRow(Filters.primaryKey(tableName, id), 1, timeout);
     }
 
-    public CompletableFuture<ListenEsResponse> listenEs(BiPredicate<Long, DmlDTO> rowTest,
-                                                        int rowCount, long timeout) {
-        CompletableFuture<ListenEsResponse> future = new CompletableFuture<>();
-        ListenEs listenEs = new ListenEs(future, rowTest, rowCount, timeout);
-        listenEsList.add(listenEs);
-        scheduled.schedule(() -> {
-            if (!future.isDone()) {
-                future.completeExceptionally(TIMEOUT_EXCEPTION);
-            }
-        }, timeout, TimeUnit.MILLISECONDS);
+    public CompletableFuture<ListenEsResponse> listenEsRows(String tableName, Iterable<?> ids, long timeout) {
+        Filters.UniquePrimaryKey filter = Filters.primaryKey(tableName, ids);
+        return listenEsRow(filter, filter.rowCount(), timeout);
+    }
+
+    public CompletableFuture<ListenEsResponse> listenEsRow(BiPredicate<Long, EsDmlDTO> rowFilter,
+                                                           int rowCount, long timeout) {
+        CompletableFuture<ListenEsResponse> future = new TimeoutCompletableFuture<>(timeout, scheduled);
+        synchronized (listenEsList) {
+            listenEsList.add(new RowListenEs(future, rowFilter, rowCount, timeout));
+        }
         return future;
     }
 
-    private static class IndexIdTest implements BiPredicate<Long, DmlDTO> {
-        private final String indexName;
-        private final Object id;
-
-        private IndexIdTest(String indexName, Object id) {
-            this.indexName = indexName;
-            this.id = id;
-        }
-
-        @Override
-        public boolean test(Long messageId, DmlDTO dml) {
-            if (!dml.getIndexNames().contains(indexName)) {
-                return false;
-            }
-            Object[] ids = dml.getIds();
-            if (ids.length != 1) {
-                return false;
-            }
-            String rowIdString = Objects.toString(ids[0], null);
-            String idString = Objects.toString(id, null);
-            return Objects.equals(rowIdString, idString);
-        }
-
-        @Override
-        public String toString() {
-            return "IndexIdTest{" +
-                    "indexName='" + indexName + '\'' +
-                    ", id=" + id +
-                    '}';
+    public void listenEs(ListenEs listenEs) {
+        synchronized (listenEsList) {
+            listenEsList.add(listenEs);
         }
     }
 
-    public static class ListenEsResponse {
-        final List<DmlDTO> hitList;
+    public static class TimeoutCompletableFuture<T> extends CompletableFuture<T> {
+        private final ScheduledFuture<?> timeoutScheduleFuture;
 
-        public ListenEsResponse(List<DmlDTO> hitList) {
-            this.hitList = hitList;
+        public TimeoutCompletableFuture(long timeout, ScheduledExecutorService scheduled) {
+            if (timeout > 0 && timeout < Integer.MAX_VALUE) {
+                this.timeoutScheduleFuture = scheduled.schedule(() -> {
+                    if (!isDone()) {
+                        completeExceptionally(TIMEOUT_EXCEPTION);
+                    }
+                }, timeout, TimeUnit.MILLISECONDS);
+            } else {
+                this.timeoutScheduleFuture = null;
+            }
         }
 
         @Override
-        public String toString() {
-            return "ListenEsResponse{" +
-                    "hitList=" + hitList +
-                    '}';
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            try {
+                if (timeoutScheduleFuture != null) {
+                    timeoutScheduleFuture.cancel(mayInterruptIfRunning);
+                }
+            } catch (Exception ignored) {
+
+            }
+            return super.cancel(mayInterruptIfRunning);
         }
     }
 
-    private static class ListenEs {
+
+    private static class RowListenEs implements ListenEs {
         final CompletableFuture<ListenEsResponse> future;
-        final BiPredicate<Long, DmlDTO> rowTest;
+        final BiPredicate<Long, EsDmlDTO> rowFilter;
         final int rowCount;
         final long timeout;
-        final List<DmlDTO> hitList;
+        final List<EsDmlDTO> hitList;
+        final long timestamp = System.currentTimeMillis();
 
-        private ListenEs(CompletableFuture<ListenEsResponse> future, BiPredicate<Long, DmlDTO> rowTest, int rowCount, long timeout) {
+        private RowListenEs(CompletableFuture<ListenEsResponse> future, BiPredicate<Long, EsDmlDTO> rowFilter, int rowCount, long timeout) {
             this.future = future;
-            this.rowTest = rowTest;
+            this.rowFilter = rowFilter;
             this.rowCount = rowCount;
             this.timeout = timeout;
             this.hitList = new ArrayList<>(Math.max(rowCount, 0));
         }
 
-        public void onEvent(Long messageId, DmlDTO dml) {
+        @Override
+        public boolean isDone() {
+            return future.isDone();
+        }
+
+        @Override
+        public void onEvent(Long messageId, EsDmlDTO dml) {
             if (future.isDone()) {
                 return;
             }
-            if (rowTest.test(messageId, dml)) {
+            if (rowFilter.test(messageId, dml)) {
                 hitList.add(dml);
                 if (hitList.size() >= rowCount) {
-                    future.complete(new ListenEsResponse(hitList));
+                    future.complete(new ListenEsResponse(hitList, timestamp));
                 }
             }
         }
 
         @Override
         public String toString() {
-            return "ListenEs{" +
+            return "HitRowListenEs{" +
                     "done=" + future.isDone() +
-                    ", rowTest=" + rowTest +
+                    ", rowTest=" + rowFilter +
                     ", rowCount=" + rowCount +
                     ", timeout=" + timeout +
                     '}';
@@ -150,11 +145,15 @@ public class DtsSdkClient {
 
         @Override
         public void run() {
-            if (listenEsList.isEmpty()) {
+            int size = listenEsList.size();
+            if (size == 0) {
                 return;
             }
             synchronized (listenEsList) {
-                listenEsList.removeIf(e -> e.future.isDone());
+                boolean b = listenEsList.removeIf(ListenEs::isDone);
+                if (b && size > 1000) {
+                    listenEsList.trimToSize();
+                }
             }
         }
     }
@@ -163,12 +162,14 @@ public class DtsSdkClient {
 
         @Override
         public void onEvent(Long messageId, Object data) {
-            if (data instanceof DmlDTO) {
-                DmlDTO dml = (DmlDTO) data;
+            if (data instanceof EsDmlDTO) {
+                EsDmlDTO dml = (EsDmlDTO) data;
                 if (!listenEsList.isEmpty()) {
                     synchronized (listenEsList) {
                         for (ListenEs listenEs : listenEsList) {
-                            listenEs.onEvent(messageId, dml);
+                            if (!listenEs.isDone()) {
+                                listenEs.onEvent(messageId, dml);
+                            }
                         }
                     }
                 }
