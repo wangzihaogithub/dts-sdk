@@ -112,7 +112,7 @@ public class Util {
                                     try {
                                         runnable.run();
                                     } catch (Exception e) {
-                                        log.warn("Scheduled error {}", e.toString(), e);
+                                        log.warn("Scheduled error {}", e, e);
                                         throw e;
                                     }
                                 } else {
@@ -167,7 +167,7 @@ public class Util {
                                     try {
                                         runnable.run();
                                     } catch (Exception e) {
-                                        log.warn("error {}", e.toString(), e);
+                                        log.warn("error {}", e, e);
                                         throw e;
                                     }
                                 } else {

@@ -33,7 +33,7 @@ public class Filters {
         }
 
         public UniquePrimaryKey(String tableName, Iterable<?> ids) {
-            this.tableName = tableName;
+            this.tableName = tableName == null || tableName.isEmpty() ? null : tableName;
             Set<String> primaryKeyStringSet;
             if (ids instanceof Collection) {
                 primaryKeyStringSet = new HashSet<>((int) (((Collection<?>) ids).size() / 0.75 + 1));
@@ -52,7 +52,7 @@ public class Filters {
 
         @Override
         public boolean test(Long messageId, EsDmlDTO dml) {
-            if (!dml.getTableName().equalsIgnoreCase(tableName)) {
+            if (tableName != null && !dml.getTableName().equalsIgnoreCase(tableName)) {
                 return false;
             }
             Object[] ids = dml.getIds();

@@ -8,11 +8,23 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 
 public class KeepaliveSocket implements Closeable {
-    private Socket socket;
     private final InetSocketAddress remoteAddress;
+    private Socket socket;
 
     public KeepaliveSocket(String host, int port) throws UnknownHostException {
         this.remoteAddress = new InetSocketAddress(InetAddress.getByName(host), port);
+    }
+
+    public static boolean isConnected(Socket socket) {
+        try {
+            if (!socket.isConnected()) {
+                return false;
+            }
+            socket.sendUrgentData(0xFF);
+            return true;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     public Socket getSocket() {
@@ -63,18 +75,6 @@ public class KeepaliveSocket implements Closeable {
                 }
                 this.socket = null;
             }
-            return false;
-        }
-    }
-
-    public static boolean isConnected(Socket socket) {
-        try {
-            if (!socket.isConnected()) {
-                return false;
-            }
-            socket.sendUrgentData(0xFF);
-            return true;
-        } catch (IOException e) {
             return false;
         }
     }

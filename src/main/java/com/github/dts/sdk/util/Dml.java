@@ -16,20 +16,20 @@ public interface Dml {
         return false;
     }
 
-    public String getTableName();
+    String getTableName();
 
-    public String getDatabase();
+    String getDatabase();
 
-    public List<String> getPkNames();
+    List<String> getPkNames();
 
-    public Long getEs();
+    Long getEs();
 
-    public Long getTs();
+    Long getTs();
 
-    public String getType();
+    String getType();
 
-    public Map<String, Object> getOld();
+    Map<String, Object> getOld();
 
-    public Map<String, Object> getData();
+    Map<String, Object> getData();
 
 }

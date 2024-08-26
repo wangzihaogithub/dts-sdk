@@ -304,7 +304,7 @@ public abstract class SQL implements Cloneable {
             } else if (o == null) {
                 o = "null";
             } else {
-                o = "'" + o.toString() + "'";
+                o = "'" + o + "'";
             }
             objects[i] = o;
         }

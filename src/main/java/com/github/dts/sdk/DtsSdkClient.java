@@ -8,14 +8,15 @@ import com.github.dts.sdk.util.ReferenceCounted;
 import com.github.dts.sdk.util.Util;
 import org.springframework.beans.factory.ListableBeanFactory;
 
-import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiPredicate;
 
 public class DtsSdkClient {
-    private static final TimeoutException TIMEOUT_EXCEPTION = new TimeoutException("DtsSdkListenTimeout");
     private final DtsDumpListener dumpListener = new DtsDumpListener();
     private final ScheduledExecutorService scheduled = Util.newScheduled(1, "DTS-scheduled", true);
     private final LinkedList<ListenEs> listenEsList = new LinkedList<>();
@@ -53,11 +54,15 @@ public class DtsSdkClient {
         return listenEsRow(filter, filter.rowCount(), timeout);
     }
 
+    public ScheduledExecutorService getScheduled() {
+        return scheduled;
+    }
+
     public CompletableFuture<ListenEsResponse> listenEsRow(BiPredicate<Long, EsDmlDTO> rowFilter,
                                                            int rowCount, long timeout) {
         CompletableFuture<ListenEsResponse> future = new TimeoutCompletableFuture<>(timeout, scheduled);
         synchronized (listenEsList) {
-            listenEsList.add(new RowListenEs(future, rowFilter, rowCount, timeout));
+            listenEsList.add(new DtsEsRowListener(future, rowFilter, rowCount));
         }
         return future;
     }
@@ -65,80 +70,6 @@ public class DtsSdkClient {
     public void listenEs(ListenEs listenEs) {
         synchronized (listenEsList) {
             listenEsList.add(listenEs);
-        }
-    }
-
-    public static class TimeoutCompletableFuture<T> extends CompletableFuture<T> {
-        private final ScheduledFuture<?> timeoutScheduleFuture;
-
-        public TimeoutCompletableFuture(long timeout, ScheduledExecutorService scheduled) {
-            if (timeout > 0 && timeout < Integer.MAX_VALUE) {
-                this.timeoutScheduleFuture = scheduled.schedule(() -> {
-                    if (!isDone()) {
-                        completeExceptionally(TIMEOUT_EXCEPTION);
-                    }
-                }, timeout, TimeUnit.MILLISECONDS);
-            } else {
-                this.timeoutScheduleFuture = null;
-            }
-        }
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
-            try {
-                if (timeoutScheduleFuture != null) {
-                    timeoutScheduleFuture.cancel(mayInterruptIfRunning);
-                }
-            } catch (Exception ignored) {
-
-            }
-            return super.cancel(mayInterruptIfRunning);
-        }
-    }
-
-
-    private static class RowListenEs implements ListenEs {
-        final CompletableFuture<ListenEsResponse> future;
-        final BiPredicate<Long, EsDmlDTO> rowFilter;
-        final int rowCount;
-        final long timeout;
-        final List<EsDmlDTO> hitList;
-        final long timestamp = System.currentTimeMillis();
-
-        private RowListenEs(CompletableFuture<ListenEsResponse> future, BiPredicate<Long, EsDmlDTO> rowFilter, int rowCount, long timeout) {
-            this.future = future;
-            this.rowFilter = rowFilter;
-            this.rowCount = rowCount;
-            this.timeout = timeout;
-            this.hitList = new ArrayList<>(Math.max(rowCount, 0));
-        }
-
-        @Override
-        public boolean isDone() {
-            return future.isDone();
-        }
-
-        @Override
-        public void onEvent(Long messageId, EsDmlDTO dml) {
-            if (future.isDone()) {
-                return;
-            }
-            if (rowFilter.test(messageId, dml)) {
-                hitList.add(dml);
-                if (hitList.size() >= rowCount) {
-                    future.complete(new ListenEsResponse(hitList, timestamp));
-                }
-            }
-        }
-
-        @Override
-        public String toString() {
-            return "HitRowListenEs{" +
-                    "done=" + future.isDone() +
-                    ", rowTest=" + rowFilter +
-                    ", rowCount=" + rowCount +
-                    ", timeout=" + timeout +
-                    '}';
         }
     }
 

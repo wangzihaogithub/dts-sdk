@@ -15,6 +15,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -53,7 +54,7 @@ public class ServerInstanceClient {
 
     public void dump(DumpListener listener, long retrySleep, int maxRetry) {
         JsonUtil.ObjectReader objectReader = JsonUtil.objectReader();
-        String basicAuth = "Basic " + Util.encodeBasicAuth(sdkInstance.getAccount(), sdkInstance.getPassword(), Charset.forName("UTF-8"));
+        String basicAuth = "Basic " + Util.encodeBasicAuth(sdkInstance.getAccount(), sdkInstance.getPassword(), StandardCharsets.UTF_8);
         URL url;
         try {
             url = new URL(String.format("http://%s:%s%s/dts/sdk/subscriber",
@@ -76,10 +77,10 @@ public class ServerInstanceClient {
                 return;
             } catch (IOException e) {
                 if (close.get()) {
-                    log.info("dump {} close {}", url, e.toString(), e);
+                    log.info("dump {} close {}", url, e, e);
                     return;
                 }
-                log.warn("dump {} fail {}", url, e.toString(), e);
+                log.warn("dump {} fail {}", url, e, e);
 
                 int retry = 0;
                 boolean success = false;
@@ -222,26 +223,6 @@ public class ServerInstanceClient {
                 '}';
     }
 
-    public interface DumpListener {
-        void onEvent(Long messageId, Object data);
-    }
-
-    static class Buffer {
-        Long id;
-        String event;
-        String data;
-
-        void clear() {
-            this.id = null;
-            this.event = null;
-            this.data = null;
-        }
-
-        public boolean isEmpty() {
-            return id == null && event == null && data == null;
-        }
-    }
-
     public enum MessageTypeEnum {
         ES_DML("es-dml"),
         RDS_SQL("rds-sql");
@@ -262,6 +243,26 @@ public class ServerInstanceClient {
 
         public String getType() {
             return type;
+        }
+    }
+
+    public interface DumpListener {
+        void onEvent(Long messageId, Object data);
+    }
+
+    static class Buffer {
+        Long id;
+        String event;
+        String data;
+
+        void clear() {
+            this.id = null;
+            this.event = null;
+            this.data = null;
+        }
+
+        public boolean isEmpty() {
+            return id == null && event == null && data == null;
         }
     }
 }
