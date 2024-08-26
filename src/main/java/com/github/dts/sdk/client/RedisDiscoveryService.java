@@ -139,10 +139,10 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
             connection.subscribe(messageServerListener, keyServerPubSubBytes, keyServerPubUnsubBytes);
             return getServerInstanceMap(connection);
         }, true);
-
         updateServerInstance(serverInstanceMap);
-        this.updateServerInstanceScheduledFuture = scheduledUpdateServerInstance();
-        this.sdkHeartbeatScheduledFuture = scheduledSdkHeartbeat();
+
+        scheduledUpdateServerInstance();
+        scheduledSdkHeartbeat();
     }
 
     @Override
@@ -161,21 +161,23 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
         }
     }
 
-    private ScheduledFuture<?> scheduledUpdateServerInstance() {
-        if (updateInstanceTimerMs <= 0) {
-            return null;
-        }
+    private void scheduledUpdateServerInstance() {
         ScheduledFuture<?> scheduledFuture = this.updateServerInstanceScheduledFuture;
         if (scheduledFuture != null) {
             scheduledFuture.cancel(false);
+            this.updateServerInstanceScheduledFuture = null;
         }
-        return getScheduled().scheduleWithFixedDelay(() -> updateServerInstance(getServerInstanceMap()), updateInstanceTimerMs, updateInstanceTimerMs, TimeUnit.MILLISECONDS);
+        if (updateInstanceTimerMs <= 0) {
+            return;
+        }
+        this.updateServerInstanceScheduledFuture = getScheduled().scheduleWithFixedDelay(() -> updateServerInstance(getServerInstanceMap()), updateInstanceTimerMs, updateInstanceTimerMs, TimeUnit.MILLISECONDS);
     }
 
-    private ScheduledFuture<?> scheduledSdkHeartbeat() {
+    private synchronized void scheduledSdkHeartbeat() {
         ScheduledFuture<?> scheduledFuture = this.sdkHeartbeatScheduledFuture;
         if (scheduledFuture != null) {
             scheduledFuture.cancel(false);
+            this.sdkHeartbeatScheduledFuture = null;
         }
         int delay;
         if (redisInstanceExpireSec == MIN_REDIS_INSTANCE_EXPIRE_SEC) {
@@ -183,7 +185,7 @@ public class RedisDiscoveryService implements DiscoveryService, DisposableBean {
         } else {
             delay = (redisInstanceExpireSec * 1000) / 3;
         }
-        return getScheduled().scheduleWithFixedDelay(() -> {
+        this.sdkHeartbeatScheduledFuture = getScheduled().scheduleWithFixedDelay(() -> {
             redisTemplate.execute(connection -> {
                 // 续期过期时间
                 Boolean success = connection.expire(keySdkSetBytes, redisInstanceExpireSec);

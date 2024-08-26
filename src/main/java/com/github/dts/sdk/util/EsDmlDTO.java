@@ -14,18 +14,20 @@ public class EsDmlDTO implements Dml {
     private String type;
     private Map<String, Object> old;
     private Map<String, Object> data;
-    private List<String> indexNames;
-    private List<String> desc;
-    private Boolean effect;
+    private List<Dependent> dependents;
     private transient Object[] id;
     private transient String toStringCache;
 
-    public Boolean getEffect() {
-        return effect;
-    }
-
-    public void setEffect(Boolean effect) {
-        this.effect = effect;
+    public boolean isEffect() {
+        if (dependents == null || dependents.isEmpty()) {
+            return false;
+        }
+        for (Dependent dependent : dependents) {
+            if (Boolean.TRUE.equals(dependent.effect)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String getIdString() {
@@ -35,12 +37,12 @@ public class EsDmlDTO implements Dml {
 
     public Long getIdLong() {
         Object id = getId();
-        return id == null ? null : Long.valueOf(id.toString());
+        return id == null ? null : id instanceof Long ? (Long) id : Long.valueOf(id.toString());
     }
 
     public Integer getIdInteger() {
         Object id = getId();
-        return id == null ? null : Integer.valueOf(id.toString());
+        return id == null ? null : id instanceof Integer ? (Integer) id : Integer.valueOf(id.toString());
     }
 
     public Object getId() {
@@ -75,21 +77,20 @@ public class EsDmlDTO implements Dml {
     public String toString() {
         if (toStringCache == null) {
             toStringCache = "EsDmlDTO{" +
-                    "sql=" + sql() +
+                    sql() +
+                    ", effect=" + isEffect() +
                     ", es=" + new Timestamp(es) +
-                    ", indexNames=" + indexNames +
-                    ", desc=" + desc +
                     '}';
         }
         return toStringCache;
     }
 
-    public List<String> getDesc() {
-        return desc;
+    public List<Dependent> getDependents() {
+        return dependents;
     }
 
-    public void setDesc(List<String> desc) {
-        this.desc = desc;
+    public void setDependents(List<Dependent> dependents) {
+        this.dependents = dependents;
     }
 
     @Override
@@ -164,11 +165,42 @@ public class EsDmlDTO implements Dml {
         this.data = data;
     }
 
-    public List<String> getIndexNames() {
-        return indexNames;
-    }
+    public static class Dependent {
+        private String name;
+        private Boolean effect;
+        private String esIndex;
 
-    public void setIndexNames(List<String> indexNames) {
-        this.indexNames = indexNames;
+        @Override
+        public String toString() {
+            return "Dependent{" +
+                    "name='" + name + '\'' +
+                    ", effect=" + effect +
+                    ", esIndex='" + esIndex + '\'' +
+                    '}';
+        }
+
+        public String getEsIndex() {
+            return esIndex;
+        }
+
+        public void setEsIndex(String esIndex) {
+            this.esIndex = esIndex;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public Boolean getEffect() {
+            return effect;
+        }
+
+        public void setEffect(Boolean effect) {
+            this.effect = effect;
+        }
     }
 }
