@@ -9,6 +9,7 @@ import com.github.dts.sdk.util.Util;
 import org.springframework.beans.factory.ListableBeanFactory;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.function.BiPredicate;
@@ -17,7 +18,7 @@ public class DtsSdkClient {
     private static final TimeoutException TIMEOUT_EXCEPTION = new TimeoutException("DtsSdkListenTimeout");
     private final DtsDumpListener dumpListener = new DtsDumpListener();
     private final ScheduledExecutorService scheduled = Util.newScheduled(1, "DTS-scheduled", true);
-    private final ArrayList<ListenEs> listenEsList = new ArrayList<>();
+    private final LinkedList<ListenEs> listenEsList = new LinkedList<>();
 
     public DtsSdkClient(DtsSdkConfig config, DiscoveryService discoveryService, ListableBeanFactory beanFactory) {
         discoveryService.registerSdkInstance();
@@ -150,10 +151,7 @@ public class DtsSdkClient {
                 return;
             }
             synchronized (listenEsList) {
-                boolean b = listenEsList.removeIf(ListenEs::isDone);
-                if (b && size > 1000) {
-                    listenEsList.trimToSize();
-                }
+                listenEsList.removeIf(ListenEs::isDone);
             }
         }
     }
