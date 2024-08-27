@@ -83,6 +83,16 @@ public class DtsEsRowFutureBuilder {
         return this;
     }
 
+    public DtsEsRowFutureBuilder addPrimaryKey(Iterable<?> ids) {
+        addPrimaryKey(null, ids, DEFAULT_ROW_TIMEOUT);
+        return this;
+    }
+
+    public DtsEsRowFutureBuilder addPrimaryKey(Iterable<?> ids, long timeout) {
+        addPrimaryKey(null, ids, timeout);
+        return this;
+    }
+
     public DtsEsRowFutureBuilder addPrimaryKey(String tableName, Iterable<?> ids, long timeout) {
         synchronized (listenEs) {
             if (build.get()) {
