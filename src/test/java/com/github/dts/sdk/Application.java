@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 
 @SpringBootApplication
@@ -23,6 +24,17 @@ public class Application {
             @Override
             public void accept(ListenEsResponse listenEsResponse, Throwable throwable) {
                 System.out.println("listenEsResponse = " + listenEsResponse + "throwable" + throwable);
+            }
+        });
+        DtsEsRowFutureBuilder builder = DtsEsRowFutureBuilder.builder(client, Integer.MAX_VALUE, "job");
+        builder.addPrimaryKey(621619);
+        builder.addPrimaryKey(621622);
+
+        CompletableFuture<ListenEsResponse> build = builder.build();
+        build.whenComplete(new BiConsumer<ListenEsResponse, Throwable>() {
+            @Override
+            public void accept(ListenEsResponse listenEsResponse, Throwable throwable) {
+                System.out.println("listenEsResponse = " + listenEsResponse);
             }
         });
 

@@ -26,6 +26,10 @@ public class DtsEsRowFutureBuilder {
         return new DtsEsRowFutureBuilder(client, null, rowTimeout);
     }
 
+    public static DtsEsRowFutureBuilder builder(DtsSdkClient client, long rowTimeout, String... tableNames) {
+        return new DtsEsRowFutureBuilder(client, Arrays.asList(tableNames), rowTimeout);
+    }
+
     public static DtsEsRowFutureBuilder builder(DtsSdkClient client, String... tableNames) {
         return new DtsEsRowFutureBuilder(client, Arrays.asList(tableNames), DEFAULT_ROW_TIMEOUT);
     }
@@ -34,8 +38,26 @@ public class DtsEsRowFutureBuilder {
         return new DtsEsRowFutureBuilder(client, tableNames, DEFAULT_ROW_TIMEOUT);
     }
 
-    public static DtsEsRowFutureBuilder builder(DtsSdkClient client, Collection<String> tableNames, long rowTimeout) {
+    public static DtsEsRowFutureBuilder builder(DtsSdkClient client, long rowTimeout, Collection<String> tableNames) {
         return new DtsEsRowFutureBuilder(client, tableNames, rowTimeout);
+    }
+
+    private static ArrayList<EsDmlDTO> getHitList(List<ListenEsResponse> list) {
+        int hitListSize = 0;
+        for (ListenEsResponse response : list) {
+            List<EsDmlDTO> hitList1 = response.getHitList();
+            if (hitList1 != null) {
+                hitListSize += hitList1.size();
+            }
+        }
+        ArrayList<EsDmlDTO> result = new ArrayList<>(hitListSize);
+        for (ListenEsResponse response : list) {
+            List<EsDmlDTO> hitList1 = response.getHitList();
+            if (hitList1 != null) {
+                result.addAll(hitList1);
+            }
+        }
+        return result;
     }
 
     public DtsEsRowFutureBuilder addPrimaryKey(Object id) {
@@ -106,13 +128,8 @@ public class DtsEsRowFutureBuilder {
                                     list.add(listenEsResponse);
                                 }
                                 if (counter.decrementAndGet() == 0) {
-                                    List<EsDmlDTO> hitList = new ArrayList<>();
-                                    for (ListenEsResponse response : list) {
-                                        List<EsDmlDTO> hitList1 = response.getHitList();
-                                        if (hitList1 != null) {
-                                            hitList.addAll(hitList1);
-                                        }
-                                    }
+                                    ArrayList<EsDmlDTO> hitList = getHitList(list);
+                                    list.clear();
                                     future.complete(new ListenEsResponse(hitList, startTimestamp));
                                 }
                             }
