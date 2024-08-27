@@ -4,14 +4,20 @@ import com.github.dts.sdk.util.EsDmlDTO;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.util.function.BiFunction;
+import java.util.function.Supplier;
 
 public class DtsEsRowFutureBuilder {
     public static final long DEFAULT_ROW_TIMEOUT = 500;
+    private static final int NOT_BUILD = 0;
+    private static final int DONE_BUILD = 1;
     private final BeforeBuilderListenEs listenEs;
     private final CompletableFuture<ListenEsResponse> future = new CompletableFuture<>();
-    private final AtomicBoolean build = new AtomicBoolean();
+    private volatile int build = NOT_BUILD;
+    private static final AtomicIntegerFieldUpdater<DtsEsRowFutureBuilder> BUILD = AtomicIntegerFieldUpdater
+            .newUpdater(DtsEsRowFutureBuilder.class, "build");
 
     public DtsEsRowFutureBuilder(DtsSdkClient client, Collection<String> tableNames, long rowTimeout) {
         this.listenEs = new BeforeBuilderListenEs(client, tableNames, rowTimeout);
@@ -72,7 +78,7 @@ public class DtsEsRowFutureBuilder {
 
     public DtsEsRowFutureBuilder addPrimaryKey(String tableName, Object id, long timeout) {
         synchronized (listenEs) {
-            if (build.get()) {
+            if (build == DONE_BUILD) {
                 throw new IllegalStateException("please call before build!");
             }
             Filters.UniquePrimaryKey filter = Filters.primaryKey(tableName, id);
@@ -95,7 +101,7 @@ public class DtsEsRowFutureBuilder {
 
     public DtsEsRowFutureBuilder addPrimaryKey(String tableName, Iterable<?> ids, long timeout) {
         synchronized (listenEs) {
-            if (build.get()) {
+            if (build == DONE_BUILD) {
                 throw new IllegalStateException("please call before build!");
             }
             Filters.UniquePrimaryKey filter = Filters.primaryKey(tableName, ids);
@@ -108,7 +114,7 @@ public class DtsEsRowFutureBuilder {
 
     public DtsEsRowFutureBuilder add(DtsEsRowListener listener) {
         synchronized (listenEs) {
-            if (build.get()) {
+            if (build == DONE_BUILD) {
                 throw new IllegalStateException("please call before build!");
             }
             listenEs.add(listener);
@@ -116,8 +122,20 @@ public class DtsEsRowFutureBuilder {
         return this;
     }
 
+    public <T> CompletableFuture<T> build(T result) {
+        return build().handle((r, t) -> result);
+    }
+
+    public <T> CompletableFuture<T> build(Supplier<T> supplier) {
+        return build().handle((r, t) -> supplier.get());
+    }
+
+    public <T> CompletableFuture<T> build(BiFunction<ListenEsResponse, Throwable, T> map) {
+        return build().handle(map);
+    }
+
     public CompletableFuture<ListenEsResponse> build() {
-        if (build.compareAndSet(false, true)) {
+        if (BUILD.compareAndSet(this, NOT_BUILD, DONE_BUILD)) {
             synchronized (listenEs) {
                 int size = listenEs.listenerList.size();
                 long startTimestamp = listenEs.startTimestamp == 0L ? System.currentTimeMillis() : listenEs.startTimestamp;

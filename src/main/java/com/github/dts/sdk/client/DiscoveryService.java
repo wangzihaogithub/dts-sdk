@@ -8,29 +8,28 @@ import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.core.env.Environment;
 
 import java.util.List;
-import java.util.Objects;
 
 public interface DiscoveryService {
 
     static DiscoveryService newInstance(DtsSdkConfig.ClusterConfig config,
                                         ListableBeanFactory beanFactory) {
         DtsSdkConfig.DiscoveryEnum discoveryEnum = config.getDiscovery();
-        if (discoveryEnum == DtsSdkConfig.DiscoveryEnum.YAML) {
-            return new YamlDiscoveryService(config);
-        }
         if (discoveryEnum == DtsSdkConfig.DiscoveryEnum.AUTO) {
-            if (!Objects.toString(config.getNacos().getServerAddr(), "").isEmpty()) {
-                discoveryEnum = DtsSdkConfig.DiscoveryEnum.NACOS;
-            } else if (PlatformDependentUtil.isSupportSpringframeworkRedis() && beanFactory.getBeanNamesForType(PlatformDependentUtil.REDIS_CONNECTION_FACTORY_CLASS).length > 0) {
+            if (PlatformDependentUtil.isSupportSpringframeworkRedis()
+                    && beanFactory.getBeanNamesForType(PlatformDependentUtil.REDIS_CONNECTION_FACTORY_CLASS).length > 0
+                    && !Util.isDefaultRedisProps(beanFactory.getBean(Environment.class))) {
                 discoveryEnum = DtsSdkConfig.DiscoveryEnum.REDIS;
+            } else if (Util.isNotBlank(config.getYaml().getSdkAccount().getAccount())
+                    && Util.isNotBlank(config.getYaml().getSdkAccount().getPassword())
+                    && Util.isNotEmpty(config.getYaml().getDtsServer())) {
+                discoveryEnum = DtsSdkConfig.DiscoveryEnum.YAML;
             }
         }
-
-        Environment env = beanFactory.getBean(Environment.class);
-        String ip = Util.getIPAddress();
-        Integer port = env.getProperty("server.port", Integer.class, 8080);
         switch (discoveryEnum) {
             case REDIS: {
+                Environment env = beanFactory.getBean(Environment.class);
+                String ip = Util.getIPAddress();
+                Integer port = env.getProperty("server.port", Integer.class, 8080);
                 DtsSdkConfig.ClusterConfig.Redis redis = config.getRedis();
                 String redisKeyRootPrefix = redis.getRedisKeyRootPrefix();
                 if (redisKeyRootPrefix != null) {
@@ -43,7 +42,12 @@ public interface DiscoveryService {
                         redis.getRedisInstanceExpireSec(),
                         config, ip, port);
             }
-            case NACOS:
+            case YAML: {
+                return new YamlDiscoveryService(config);
+            }
+            case NACOS: {
+                throw new IllegalArgumentException("current version is not support nacos!");
+            }
             default: {
                 throw new IllegalArgumentException("ServiceDiscoveryService newInstance fail! remote discovery config is empty!");
             }

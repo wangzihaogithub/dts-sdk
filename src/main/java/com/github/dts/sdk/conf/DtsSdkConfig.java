@@ -10,7 +10,7 @@ public class DtsSdkConfig {
     private final ClusterConfig cluster = new ClusterConfig();
     private long requestRetrySleep = 6000L;
     private int requestMaxRetry = 10;
-    private int clearDoneInterval = 100;
+    private int clearDoneInterval = 50;
 
     public int getClearDoneInterval() {
         return clearDoneInterval;
@@ -52,7 +52,7 @@ public class DtsSdkConfig {
         private final Nacos nacos = new Nacos();
         private final Yaml yaml = new Yaml();
         private int testSocketTimeoutMs = 500;
-        private DiscoveryEnum discovery = DiscoveryEnum.REDIS;
+        private DiscoveryEnum discovery = DiscoveryEnum.AUTO;
         private String remoteContextPath = "";
 
         public String remoteContextPath() {

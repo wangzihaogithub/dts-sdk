@@ -4,12 +4,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
+import org.springframework.core.env.Environment;
 import org.springframework.scheduling.concurrent.CustomizableThreadFactory;
 
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.nio.charset.Charset;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Objects;
 import java.util.concurrent.*;
@@ -29,6 +31,10 @@ public class Util {
         String credentialsString = username + ":" + password;
         byte[] encodedBytes = Base64.getEncoder().encode(credentialsString.getBytes(charset));
         return new String(encodedBytes, charset);
+    }
+
+    public static boolean isNotEmpty(Collection collection) {
+        return collection != null && !collection.isEmpty();
     }
 
     public static boolean isBlank(String str) {
@@ -182,5 +188,24 @@ public class Util {
                         }
                     }
                 });
+    }
+
+    public static boolean isDefaultRedisProps(Environment env) {
+        String[] props = new String[]{
+                "spring.redis.url",
+                "spring.redis.host",
+                "spring.redis.port",
+                "spring.redis.database",
+                "spring.redis.username",
+                "spring.redis.password",
+                "spring.redis.cluster.nodes",
+                "spring.redis.sentinel.nodes"
+        };
+        for (String prop : props) {
+            if (env.containsProperty(prop)) {
+                return false;
+            }
+        }
+        return true;
     }
 }
