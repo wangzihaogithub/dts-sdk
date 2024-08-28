@@ -54,7 +54,7 @@ public class ServerInstanceClient {
 
     public void dump(DumpListener listener, long retrySleep, int maxRetry) {
         JsonUtil.ObjectReader objectReader = JsonUtil.objectReader();
-        String basicAuth = "Basic " + Util.encodeBasicAuth(sdkInstance.getAccount(), sdkInstance.getPassword(), StandardCharsets.UTF_8);
+        String basicAuth = "Basic " + Util.encodeBasicAuth(sdkInstance.getAccount(), sdkInstance.getPassword(), Charset.forName("ISO-8859-1"));
         URL url;
         try {
             url = new URL(String.format("http://%s:%s%s/dts/sdk/subscriber",
