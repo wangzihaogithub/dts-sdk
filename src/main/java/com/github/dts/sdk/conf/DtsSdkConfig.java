@@ -107,7 +107,6 @@ public class DtsSdkConfig {
             private String redisConnectionFactoryBeanName = "redisConnectionFactory";
             private String redisKeyRootPrefix = "dts:${spring.profiles.active:def}";
             private int redisInstanceExpireSec = 10;
-            private int messageIdIncrementDelta = 50;
             // 防止sub，pub命令有延迟，增加定时轮训
             private int updateInstanceTimerMs = 5000;
 
@@ -117,14 +116,6 @@ public class DtsSdkConfig {
 
             public void setUpdateInstanceTimerMs(int updateInstanceTimerMs) {
                 this.updateInstanceTimerMs = updateInstanceTimerMs;
-            }
-
-            public int getMessageIdIncrementDelta() {
-                return messageIdIncrementDelta;
-            }
-
-            public void setMessageIdIncrementDelta(int messageIdIncrementDelta) {
-                this.messageIdIncrementDelta = messageIdIncrementDelta;
             }
 
             public String getRedisConnectionFactoryBeanName() {
@@ -173,7 +164,7 @@ public class DtsSdkConfig {
         public static class Nacos {
             private String serverAddr = "${nacos.discovery.server-addr:${nacos.config.server-addr:${spring.cloud.nacos.server-addr:${spring.cloud.nacos.discovery.server-addr:${spring.cloud.nacos.config.server-addr:}}}}}";
             private String namespace = "${nacos.discovery.namespace:${nacos.config.namespace:${spring.cloud.nacos.namespace:${spring.cloud.nacos.discovery.namespace:${spring.cloud.nacos.config.namespace:}}}}}";
-            private String serviceName = "${spring.application.name:sse-server}";
+            private String serviceName = "${spring.application.name:dts-sdk}";
             private String clusterName = "${nacos.discovery.clusterName:${nacos.config.clusterName:${spring.cloud.nacos.clusterName:${spring.cloud.nacos.discovery.clusterName:${spring.cloud.nacos.config.clusterName:DEFAULT}}}}}";
             private Properties properties = new Properties();
 
