@@ -1,7 +1,6 @@
 package com.github.dts.sdk;
 
 import com.github.dts.sdk.util.EsDmlDTO;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -12,20 +11,28 @@ import java.util.function.BiConsumer;
 
 @SpringBootApplication
 public class Application {
-    @Autowired
-    private DtsSdkClient dtsSdkClient;
 
     public static void main(String[] args) {
         ConfigurableApplicationContext context = SpringApplication.run(Application.class, args);
 
         DtsSdkClient client = context.getBean(DtsSdkClient.class);
+        listenEsRow(client);
+        builder(client);
+        listenEs(client);
+    }
 
-        client.listenEsRow("cnwy_job_test_index_alias", 1577353, 100).whenComplete(new BiConsumer<ListenEsResponse, Throwable>() {
-            @Override
-            public void accept(ListenEsResponse listenEsResponse, Throwable throwable) {
-                System.out.println("listenEsResponse = " + listenEsResponse + "throwable" + throwable);
-            }
-        });
+
+    private static void listenEsRow(DtsSdkClient client) {
+        client.listenEsRow("cnwy_job_test_index_alias", 1577353, 5000)
+                .whenComplete(new BiConsumer<ListenEsResponse, Throwable>() {
+                    @Override
+                    public void accept(ListenEsResponse listenEsResponse, Throwable throwable) {
+                        System.out.println("listenEsResponse = " + listenEsResponse + "throwable" + throwable);
+                    }
+                });
+    }
+
+    private static void builder(DtsSdkClient client) {
         DtsEsRowFutureBuilder builder = DtsEsRowFutureBuilder.builder(client, Integer.MAX_VALUE, "job");
         builder.addPrimaryKey(621619);
         builder.addPrimaryKey(621622);
@@ -37,7 +44,9 @@ public class Application {
                 System.out.println("listenEsResponse = " + listenEsResponse);
             }
         });
+    }
 
+    private static void listenEs(DtsSdkClient client) {
         client.listenEs(new ListenEs() {
             private boolean done;
 

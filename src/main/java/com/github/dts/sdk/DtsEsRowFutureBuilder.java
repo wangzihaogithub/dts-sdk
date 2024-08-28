@@ -10,17 +10,19 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public class DtsEsRowFutureBuilder {
-    public static final long DEFAULT_ROW_TIMEOUT = 500;
+    public static final long DEFAULT_ROW_TIMEOUT = 1000;
     private static final int NOT_BUILD = 0;
     private static final int DONE_BUILD = 1;
-    private final BeforeBuilderListenEs listenEs;
-    private final CompletableFuture<ListenEsResponse> future = new CompletableFuture<>();
-    private volatile int build = NOT_BUILD;
     private static final AtomicIntegerFieldUpdater<DtsEsRowFutureBuilder> BUILD = AtomicIntegerFieldUpdater
             .newUpdater(DtsEsRowFutureBuilder.class, "build");
+    private final BeforeBuilderListenEs listenEs;
+    private final CompletableFuture<ListenEsResponse> future = new CompletableFuture<>();
+    private final long rowTimeout;
+    private volatile int build = NOT_BUILD;
 
     public DtsEsRowFutureBuilder(DtsSdkClient client, Collection<String> tableNames, long rowTimeout) {
-        this.listenEs = new BeforeBuilderListenEs(client, tableNames, rowTimeout);
+        this.listenEs = new BeforeBuilderListenEs(client, tableNames);
+        this.rowTimeout = rowTimeout;
         client.listenEs(listenEs);
     }
 
@@ -67,12 +69,12 @@ public class DtsEsRowFutureBuilder {
     }
 
     public DtsEsRowFutureBuilder addPrimaryKey(Object id) {
-        addPrimaryKey(null, id, listenEs.rowTimeout);
+        addPrimaryKey(null, id, rowTimeout);
         return this;
     }
 
     public DtsEsRowFutureBuilder addPrimaryKey(String tableName, Object id) {
-        addPrimaryKey(tableName, id, listenEs.rowTimeout);
+        addPrimaryKey(tableName, id, rowTimeout);
         return this;
     }
 
@@ -90,7 +92,7 @@ public class DtsEsRowFutureBuilder {
     }
 
     public DtsEsRowFutureBuilder addPrimaryKey(Iterable<?> ids) {
-        addPrimaryKey(null, ids, DEFAULT_ROW_TIMEOUT);
+        addPrimaryKey(null, ids, rowTimeout);
         return this;
     }
 
@@ -171,7 +173,7 @@ public class DtsEsRowFutureBuilder {
     }
 
     private static class BeforeBuilderListenEs implements ListenEs {
-        private final long rowTimeout;
+
         private final DtsSdkClient client;
         private final Set<String> tableNames;
         private final List<DtsEsRowListener> listenerList = new ArrayList<>();
@@ -179,10 +181,9 @@ public class DtsEsRowFutureBuilder {
         private long startTimestamp;
         private volatile boolean done;
 
-        private BeforeBuilderListenEs(DtsSdkClient client, Collection<String> tableNames, long rowTimeout) {
+        private BeforeBuilderListenEs(DtsSdkClient client, Collection<String> tableNames) {
             this.client = client;
             this.tableNames = tableNames == null || tableNames.isEmpty() ? null : new HashSet<>(tableNames);
-            this.rowTimeout = rowTimeout;
         }
 
         private void add(DtsEsRowListener listenEs) {

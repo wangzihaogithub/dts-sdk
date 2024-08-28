@@ -1,9 +1,4 @@
-server:
-  dts:
-    sdk:
-      cluster:
-        discovery: redis
 spring:
   redis:
-    host: localhost
-    password: xxx
+    host: 'xxx.redis.rds.aliyuncs.com'
+    password: 'xxx'
