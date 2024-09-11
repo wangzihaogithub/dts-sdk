@@ -11,8 +11,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class DtsAutoConfiguration {
     @Bean
-    public DtsSdkClient dtsClient(DtsSdkConfig config, DiscoveryService discoveryService, ListableBeanFactory beanFactory) {
-        return new DtsSdkClient(config, discoveryService, beanFactory);
+    public DtsSdkClient dtsClient(DtsSdkConfig config, DiscoveryService discoveryService) {
+        return new DtsSdkClient(config, discoveryService);
     }
 
     @Bean

@@ -10,7 +10,7 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 public class DtsEsRowFutureBuilder {
-    public static final long DEFAULT_ROW_TIMEOUT = 1000;
+    public static final long DEFAULT_ROW_TIMEOUT = 2000;
     private static final int NOT_BUILD = 0;
     private static final int DONE_BUILD = 1;
     private static final AtomicIntegerFieldUpdater<DtsEsRowFutureBuilder> BUILD = AtomicIntegerFieldUpdater
@@ -21,6 +21,7 @@ public class DtsEsRowFutureBuilder {
     private volatile int build = NOT_BUILD;
 
     public DtsEsRowFutureBuilder(DtsSdkClient client, Collection<String> tableNames, long rowTimeout) {
+        Objects.requireNonNull(client, "client must not be null");
         this.listenEs = new BeforeBuilderListenEs(client, tableNames);
         this.rowTimeout = rowTimeout;
         client.listenEs(listenEs);
@@ -83,7 +84,7 @@ public class DtsEsRowFutureBuilder {
             if (build == DONE_BUILD) {
                 throw new IllegalStateException("please call before build!");
             }
-            Filters.UniquePrimaryKey filter = Filters.primaryKey(tableName, id);
+            Filters.UniquePrimaryKey filter = id instanceof Iterable ? Filters.primaryKey(tableName, (Iterable<?>) id) : Filters.primaryKey(tableName, id);
             CompletableFuture<ListenEsResponse> future = new TimeoutCompletableFuture<>(timeout, listenEs.client.getScheduled());
             DtsEsRowListener listener = new DtsEsRowListener(future, filter, filter.rowCount());
             listenEs.add(listener);
@@ -141,8 +142,8 @@ public class DtsEsRowFutureBuilder {
             synchronized (listenEs) {
                 int size = listenEs.listenerList.size();
                 long startTimestamp = listenEs.startTimestamp == 0L ? System.currentTimeMillis() : listenEs.startTimestamp;
-                if (size == 0) {
-                    future.complete(new ListenEsResponse(new ArrayList<>(), startTimestamp));
+                if (listenEs.client.getDumpCount() == 0 || size == 0) {
+                    future.complete(new ListenEsResponse(Collections.emptyList(), startTimestamp));
                 } else {
                     AtomicInteger counter = new AtomicInteger(size);
                     List<ListenEsResponse> list = new ArrayList<>(size);
