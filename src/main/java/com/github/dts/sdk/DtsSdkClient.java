@@ -14,7 +14,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -26,8 +25,6 @@ public class DtsSdkClient {
     private final LinkedList<ListenEs> listenEsList = new LinkedList<>();
     private final ScheduledExecutorService scheduled = Util.newScheduled(
             1, () -> "DTS-scheduled", e -> log.warn("Scheduled error {}", e.toString(), e));
-    private final ThreadPoolExecutor executor = Util.newFixedThreadPool(
-            0, 1000, 30000, "DTS-dump", true, true);
     private final List<DumpThread> dumpThreadList = Collections.synchronizedList(new LinkedList<>());
 
     public DtsSdkClient(DtsSdkConfig config, DiscoveryService discoveryService) {
@@ -146,6 +143,9 @@ public class DtsSdkClient {
             dumpThreadList.add(this);
             try {
                 client.dump(dumpListener, config.getRequestRetrySleep(), config.getRequestMaxRetry());
+            } catch (Throwable e) {
+                log.error("DumpThread error exit {} {} {}", getName(), e.toString(), e);
+                throw e;
             } finally {
                 dumpThreadList.remove(this);
             }
@@ -161,8 +161,7 @@ public class DtsSdkClient {
 
         @Override
         public void run() {
-            int size = listenEsList.size();
-            if (size == 0) {
+            if (listenEsList.isEmpty()) {
                 return;
             }
             synchronized (listenEsList) {
@@ -183,13 +182,21 @@ public class DtsSdkClient {
             if (data instanceof EsDmlDTO) {
                 EsDmlDTO dml = (EsDmlDTO) data;
                 if (!listenEsList.isEmpty()) {
-                    synchronized (listenEsList) {
-                        for (ListenEs listenEs : listenEsList) {
-                            if (!listenEs.isDone()) {
-                                listenEs.onEvent(messageId, dml);
-                            }
+                    for (ListenEs listenEs : listenEsList()) {
+                        if (!listenEs.isDone()) {
+                            listenEs.onEvent(messageId, dml);
                         }
                     }
+                }
+            }
+        }
+
+        private ListenEs[] listenEsList() {
+            while (true) {
+                try {
+                    return listenEsList.toArray(new ListenEs[listenEsList.size()]);
+                } catch (Exception e) {
+
                 }
             }
         }
