@@ -15,6 +15,8 @@ public class EsDmlDTO implements Dml {
     private Map<String, Object> old;
     private Map<String, Object> data;
     private List<Dependent> dependents;
+    private String adapterName;
+
     private transient Object[] id;
     private transient String toStringCache;
 
@@ -80,9 +82,18 @@ public class EsDmlDTO implements Dml {
                     sql() +
                     ", effect=" + isEffect() +
                     ", es=" + new Timestamp(es) +
+                    ", adapterName=" + adapterName +
                     '}';
         }
         return toStringCache;
+    }
+
+    public String getAdapterName() {
+        return adapterName;
+    }
+
+    public void setAdapterName(String adapterName) {
+        this.adapterName = adapterName;
     }
 
     public List<Dependent> getDependents() {

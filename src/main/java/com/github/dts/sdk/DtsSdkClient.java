@@ -16,7 +16,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Supplier;
@@ -29,7 +28,7 @@ public class DtsSdkClient {
             1, () -> "DTS-scheduled", e -> log.warn("Scheduled error {}", e.toString(), e));
     private final ThreadPoolExecutor executor = Util.newFixedThreadPool(
             0, 1000, 30000, "DTS-dump", true, true);
-    private final AtomicInteger dumpCount = new AtomicInteger(0);
+    private final List<DumpThread> dumpThreadList = Collections.synchronizedList(new LinkedList<>());
 
     public DtsSdkClient(DtsSdkConfig config, DiscoveryService discoveryService) {
         discoveryService.registerSdkInstance();
@@ -39,26 +38,17 @@ public class DtsSdkClient {
         DtsDumpListener dumpListener = new DtsDumpListener(listenEsList);
         try (ReferenceCounted<List<ServerInstanceClient>> ref = discoveryService.getServerListRef()) {
             for (ServerInstanceClient client : ref.get()) {
-                executor.execute(() -> executeDump(client, dumpListener, config, dumpCount));
+                new DumpThread(client, dumpListener, config, dumpThreadList).start();
             }
         }
         discoveryService.addServerListener(new DiscoveryService.ServerListener() {
             @Override
             public <E extends ServerInstanceClient> void onChange(DiscoveryService.ServerChangeEvent<E> event) {
                 for (E client : event.insertList) {
-                    executor.execute(() -> executeDump(client, dumpListener, config, dumpCount));
+                    new DumpThread(client, dumpListener, config, dumpThreadList).start();
                 }
             }
         });
-    }
-
-    private static void executeDump(ServerInstanceClient client, DtsDumpListener dumpListener, DtsSdkConfig config, AtomicInteger dumpCount) {
-        dumpCount.incrementAndGet();
-        try {
-            client.dump(dumpListener, config.getRequestRetrySleep(), config.getRequestMaxRetry());
-        } finally {
-            dumpCount.decrementAndGet();
-        }
     }
 
     public CompletableFuture<ListenEsResponse> listenEsRow(String tableName, Object id) {
@@ -114,12 +104,12 @@ public class DtsSdkClient {
     }
 
     public int getDumpCount() {
-        return dumpCount.get();
+        return dumpThreadList.size();
     }
 
     public CompletableFuture<ListenEsResponse> listenEsRow(BiPredicate<Long, EsDmlDTO> rowFilter,
                                                            int rowCount, long timeout) {
-        if (dumpCount.get() == 0) {
+        if (dumpThreadList.isEmpty()) {
             return CompletableFuture.completedFuture(new ListenEsResponse(Collections.emptyList(), System.currentTimeMillis()));
         } else {
             CompletableFuture<ListenEsResponse> future = new TimeoutCompletableFuture<>(timeout, scheduled);
@@ -131,6 +121,34 @@ public class DtsSdkClient {
     public void listenEs(ListenEs listenEs) {
         synchronized (listenEsList) {
             listenEsList.add(listenEs);
+        }
+    }
+
+    private static class DumpThread extends Thread {
+        private final List<DumpThread> dumpThreadList;
+        private final ServerInstanceClient client;
+        private final DtsDumpListener dumpListener;
+        private final DtsSdkConfig config;
+
+        private DumpThread(ServerInstanceClient client,
+                           DtsDumpListener dumpListener,
+                           DtsSdkConfig config,
+                           List<DumpThread> dumpThreadList) {
+            super("DTS-dump-" + client.getServerInstance().getIp() + "_" + client.getServerInstance().getPort());
+            this.dumpThreadList = dumpThreadList;
+            this.client = client;
+            this.dumpListener = dumpListener;
+            this.config = config;
+        }
+
+        @Override
+        public void run() {
+            dumpThreadList.add(this);
+            try {
+                client.dump(dumpListener, config.getRequestRetrySleep(), config.getRequestMaxRetry());
+            } finally {
+                dumpThreadList.remove(this);
+            }
         }
     }
 

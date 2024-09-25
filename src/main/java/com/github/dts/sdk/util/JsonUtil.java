@@ -10,6 +10,7 @@ public class JsonUtil {
         if (PlatformDependentUtil.JACKSON_OBJECT_MAPPER_CONSTRUCTOR != null && PlatformDependentUtil.JACKSON_READ_VALUE_METHOD != null) {
             try {
                 Object jacksonObjectMapper = PlatformDependentUtil.JACKSON_OBJECT_MAPPER_CONSTRUCTOR.newInstance();
+                jacksonConfigure(jacksonObjectMapper);
                 return new ObjectReader() {
                     @Override
                     public <T> T readValue(String json, Class<T> type) throws IOException {
@@ -39,6 +40,18 @@ public class JsonUtil {
             };
         }
         throw new UnsupportedOperationException("objectReader#jsonToBean");
+    }
+
+    private static void jacksonConfigure(Object jacksonObjectMapper) {
+        if (PlatformDependentUtil.JACKSON_DESERIALIZATION_FEATURE_CLASS == null || PlatformDependentUtil.JACKSON_CONFIGURE_METHOD == null) {
+            return;
+        }
+        try {
+            Enum failOnUnknownProperties = Enum.valueOf(PlatformDependentUtil.JACKSON_DESERIALIZATION_FEATURE_CLASS, "FAIL_ON_UNKNOWN_PROPERTIES");
+            PlatformDependentUtil.JACKSON_CONFIGURE_METHOD.invoke(jacksonObjectMapper, failOnUnknownProperties, false);
+        } catch (Exception e) {
+            System.err.println("jacksonConfigure fail " + e);
+        }
     }
 
     public interface ObjectReader {
